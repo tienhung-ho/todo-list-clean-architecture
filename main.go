@@ -1,19 +1,17 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
-
-// "id" int8 NOT NULL DEFAULT nextval('todo_items_id_seq'::regclass),
-//     "title" varchar(255) NOT NULL,
-//     "image" json,
-//     "description" text,
-//     "status" "public"."status_enum" DEFAULT 'Doing'::status_enum,
-//     "created_at" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-//     "updated_at" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
 type TodoItem struct {
 	Id          int        `json:"id"`
@@ -25,11 +23,30 @@ type TodoItem struct {
 }
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	// Get database URL from environment variable
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("Environment variable DATABASE_URL is not set")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println("Database connection successful")
+	fmt.Println(db)
+
 	r := gin.Default()
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
+			"data": "ok",
 		})
 	})
-	r.Run(":3000") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	r.Run(":3000") // listen and serve on 0.0.0.0:3000 (for windows "localhost:3000")
 }
