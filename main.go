@@ -72,9 +72,9 @@ func main() {
 		{
 			items.POST("", CreateItem(db))
 			items.GET("")
-			items.GET("/:id", GetItem((db)))
+			items.GET("/:id", GetItem(db))
 			items.PATCH("/:id", EditItem(db))
-			items.DELETE("/:id")
+			items.DELETE("/:id", DeleteItem(db))
 		}
 	}
 
@@ -165,6 +165,36 @@ func EditItem(db *gorm.DB) func(c *gin.Context) {
 		}
 
 		if err := db.Where("id = ?", id).Updates(&data).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"data": true,
+		})
+
+	}
+}
+
+func DeleteItem(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+
+		if err != nil {
+			fmt.Println("aaaaaaaaaa")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+
+			return
+		}
+
+		if err := db.Table(TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{
+			"status": "Deleted",
+		}).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),
 			})
