@@ -42,6 +42,24 @@ type TodoItemUpdate struct {
 
 func (TodoItemUpdate) TableName() string { return TodoItem{}.TableName() }
 
+type Paging struct {
+	Page  int   `json:"page" form:"page"`
+	Limit int   `json:"limit" form:"limit"`
+	Total int64 `json:"total" form:"-"`
+}
+
+func (p *Paging) Process() {
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+
+	if p.Limit <= 0 {
+		p.Limit = 5
+	}
+
+	return
+}
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
@@ -71,7 +89,7 @@ func main() {
 		items := v1.Group("/items")
 		{
 			items.POST("", CreateItem(db))
-			items.GET("")
+			items.GET("", ListItem(db))
 			items.GET("/:id", GetItem(db))
 			items.PATCH("/:id", EditItem(db))
 			items.DELETE("/:id", DeleteItem(db))
@@ -204,6 +222,49 @@ func DeleteItem(db *gorm.DB) func(c *gin.Context) {
 
 		c.JSON(http.StatusOK, gin.H{
 			"data": true,
+		})
+
+	}
+}
+
+func ListItem(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var paging Paging
+
+		if err := c.ShouldBind(&paging); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		paging.Process()
+
+		var result []TodoItem
+
+		if err := db.Table(TodoItem{}.TableName()).
+			Where("status != ?", "Deleted").
+			Count(&paging.Total).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+		}
+
+		if err := db.Order("id desc").
+			Offset((paging.Page-1)*paging.Limit).
+			Limit(paging.Limit).
+			Where("status != ?", "Deleted").
+			Find(&result).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"data":  result,
+			"total": paging.Total,
 		})
 
 	}
