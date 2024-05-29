@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,13 +15,15 @@ import (
 )
 
 type TodoItem struct {
-	Id          int        `json:"id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Status      string     `json:"status"`
-	Created_at  *time.Time `json:"created_at"`
-	Updated_at  *time.Time `json:"updated_at"`
+	Id          int        `json:"id" gorm:"column:id;"`
+	Title       string     `json:"title" gorm:"column:title;"`
+	Description string     `json:"description" gorm:"column:description;"`
+	Status      string     `json:"status" gorm:"column:status;"`
+	Created_at  *time.Time `json:"created_at" gorm:"column:created_at;"`
+	Updated_at  *time.Time `json:"updated_at" gorm:"column:updated_at;"`
 }
+
+func (TodoItem) TableName() string { return "todo_items" }
 
 type TodoItemCreation struct {
 	Id          int    `json:"-" gorm:"column:id;"`
@@ -29,7 +32,7 @@ type TodoItemCreation struct {
 	Status      string `json:"status" gorm:"column:status;"`
 }
 
-func (TodoItemCreation) TableName() string { return "todo_items" }
+func (TodoItemCreation) TableName() string { return TodoItem{}.TableName() }
 
 func main() {
 	if err := godotenv.Load(); err != nil {
@@ -61,7 +64,7 @@ func main() {
 		{
 			items.POST("", CreateItem(db))
 			items.GET("")
-			items.GET("/:id")
+			items.GET("/:id", GetItem((db)))
 			items.PATCH("/:id")
 			items.DELETE("/:id")
 		}
@@ -98,6 +101,36 @@ func CreateItem(db *gorm.DB) func(c *gin.Context) {
 
 		c.JSON(http.StatusOK, gin.H{
 			"data": data.Id,
+		})
+
+	}
+}
+
+func GetItem(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var data TodoItem
+		id, err := strconv.Atoi(c.Param("id"))
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+
+			return
+		}
+
+		data.Id = id
+
+		if err := db.Where("id = ?", id).First(&data).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"data": data,
 		})
 
 	}

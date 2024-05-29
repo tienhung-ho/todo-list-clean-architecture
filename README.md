@@ -1,2 +1,2 @@
-# todo-list-clean-architecture
-# todo-list-clean-architecture
+# Create project with clean architecture
+
