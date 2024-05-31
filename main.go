@@ -1,119 +1,21 @@
 package main
 
 import (
-	"database/sql/driver"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
+	"todo-list/common"
+	"todo-list/modules/items/model"
+	ginitem "todo-list/modules/items/transport/gin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/tienhung-ho/todo-list-clean-architecture/common"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-type ItemStatus int
-
-const (
-	ItemStatusDoing ItemStatus = iota
-	ItemStatusDone
-	ItemStatusDeleted
-)
-
-var allItemStatuses = [3]string{"Doing", "Done", "Deleted"}
-
-func (item ItemStatus) String() string {
-	return allItemStatuses[item]
-}
-
-func parseStr2ItemStatus(s string) (ItemStatus, error) {
-	for i := range allItemStatuses {
-		if allItemStatuses[i] == s {
-			return ItemStatus(i), nil
-		}
-	}
-
-	return ItemStatus(0), errors.New(fmt.Sprintln("Ivalid status string!!!"))
-}
-
-func (item *ItemStatus) Scan(value interface{}) error {
-	var str string
-	switch v := value.(type) {
-	case string:
-		str = v
-	case []byte:
-		str = string(v)
-	default:
-		return fmt.Errorf("unsupported data type: %T", value)
-	}
-
-	v, err := parseStr2ItemStatus(str)
-
-	if err != nil {
-		return fmt.Errorf("fail to scan data from database: %v", value)
-	}
-
-	*item = v
-	return nil
-}
-
-func (item *ItemStatus) Value() (driver.Value, error) {
-	if item == nil {
-		return nil, nil
-	}
-
-	return item.String(), nil
-}
-
-func (item *ItemStatus) MarshalJSON() ([]byte, error) {
-	if item == nil {
-		return nil, nil
-	}
-	return []byte(fmt.Sprintf("\"%s\"", item.String())), nil
-}
-
-func (item *ItemStatus) UnmarshalJSON(data []byte) error {
-	str := strings.ReplaceAll(string(data), "\"", "")
-	itemValue, err := parseStr2ItemStatus(str)
-	if err != nil {
-		return fmt.Errorf("fail to scan data from database")
-	}
-
-	*item = itemValue
-
-	return nil
-}
-
-type TodoItem struct {
-	Title       string      `json:"title" gorm:"column:title;"`
-	Description string      `json:"description" gorm:"column:description;"`
-	Status      *ItemStatus `json:"status" gorm:"column:status;"`
-	common.SqlModel
-}
-
-func (TodoItem) TableName() string { return "todo_items" }
-
-type TodoItemCreation struct {
-	Id          int         `json:"-" gorm:"column:id;"`
-	Title       string      `json:"title" gorm:"column:title;"`
-	Description string      `json:"description" gorm:"column:description;"`
-	Status      *ItemStatus `json:"status" gorm:"column:status;"`
-}
-
-func (TodoItemCreation) TableName() string { return TodoItem{}.TableName() }
-
-type TodoItemUpdate struct {
-	Title       *string     `json:"title" gorm:"column:title;"`
-	Description *string     `json:"description" gorm:"column:description;"`
-	Status      *ItemStatus `json:"status" gorm:"column:status;"`
-}
-
-func (TodoItemUpdate) TableName() string { return TodoItem{}.TableName() }
 
 func main() {
 	if err := godotenv.Load(); err != nil {
@@ -143,7 +45,7 @@ func main() {
 	{
 		items := v1.Group("/items")
 		{
-			items.POST("", CreateItem(db))
+			items.POST("", ginitem.CreateItem(db))
 			items.GET("", ListItem(db))
 			items.GET("/:id", GetItem(db))
 			items.PATCH("/:id", EditItem(db))
@@ -156,39 +58,12 @@ func main() {
 			"data": "ok",
 		})
 	})
-	r.Run(":3000") // listen and serve on 0.0.0.0:3000 (for windows "localhost:3000")
-}
-
-func CreateItem(db *gorm.DB) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		var data TodoItemCreation
-		if err := c.ShouldBind(&data); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		if data.Status == nil {
-			defaultStatus := ItemStatus(0)
-			data.Status = &defaultStatus
-		}
-
-		if err := db.Create(&data).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, common.SimpleSuccesResponse(data.Id))
-
-	}
+	r.Run(os.Getenv("PORT")) // listen and serve on 0.0.0.0:3000 (for windows "localhost:3000")
 }
 
 func GetItem(db *gorm.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		var data TodoItem
+		var data model.TodoItem
 		id, err := strconv.Atoi(c.Param("id"))
 
 		if err != nil {
@@ -216,7 +91,7 @@ func GetItem(db *gorm.DB) func(c *gin.Context) {
 
 func EditItem(db *gorm.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		var data TodoItemUpdate
+		var data model.TodoItemUpdate
 		id, err := strconv.Atoi(c.Param("id"))
 
 		if err != nil {
@@ -260,7 +135,7 @@ func DeleteItem(db *gorm.DB) func(c *gin.Context) {
 			return
 		}
 
-		if err := db.Table(TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{
+		if err := db.Table(model.TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{
 			"status": "Deleted",
 		}).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -288,9 +163,9 @@ func ListItem(db *gorm.DB) func(c *gin.Context) {
 
 		paging.Process()
 
-		var result []TodoItem
+		var result []model.TodoItem
 
-		if err := db.Table(TodoItem{}.TableName()).
+		if err := db.Table(model.TodoItem{}.TableName()).
 			Where("status != ?", "Deleted").
 			Count(&paging.Total).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
