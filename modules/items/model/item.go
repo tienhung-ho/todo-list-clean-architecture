@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	ErrTitleBlank = errors.New("cannot leave title blank")
+	ErrTitleBlank  = errors.New("cannot leave title blank")
+	ErrItemDeleted = errors.New("item is deleted!")
 )
 
 type TodoItem struct {
