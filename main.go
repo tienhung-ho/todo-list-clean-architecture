@@ -5,8 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"todo-list/common"
-	"todo-list/modules/items/model"
 	ginitem "todo-list/modules/items/transport/gin"
 
 	"github.com/gin-gonic/gin"
@@ -45,7 +43,7 @@ func main() {
 		items := v1.Group("/items")
 		{
 			items.POST("", ginitem.CreateItem(db))
-			items.GET("", ListItem(db))
+			items.GET("", ginitem.ListItem(db))
 			items.GET("/:id", ginitem.GetItem(db))
 			items.PATCH("/:id", ginitem.UpdateItem(db))
 			items.DELETE("/:id", ginitem.DeleteItem(db))
@@ -58,44 +56,4 @@ func main() {
 		})
 	})
 	r.Run(os.Getenv("PORT")) // listen and serve on 0.0.0.0:3000 (for windows "localhost:3000")
-}
-
-func ListItem(db *gorm.DB) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		var paging common.Paging
-
-		if err := c.ShouldBind(&paging); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		paging.Process()
-
-		var result []model.TodoItem
-
-		if err := db.Table(model.TodoItem{}.TableName()).
-			Where("status != ?", "Deleted").
-			Count(&paging.Total).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-		}
-
-		if err := db.Order("id desc").
-			Offset((paging.Page-1)*paging.Limit).
-			Limit(paging.Limit).
-			Where("status != ?", "Deleted").
-			Find(&result).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-
-			return
-		}
-
-		c.JSON(http.StatusOK, common.NewSuccesResponse(result, paging, nil))
-
-	}
 }
