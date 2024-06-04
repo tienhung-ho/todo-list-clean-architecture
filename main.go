@@ -47,7 +47,7 @@ func main() {
 		{
 			items.POST("", ginitem.CreateItem(db))
 			items.GET("", ListItem(db))
-			items.GET("/:id", GetItem(db))
+			items.GET("/:id", ginitem.GetItem(db))
 			items.PATCH("/:id", EditItem(db))
 			items.DELETE("/:id", DeleteItem(db))
 		}
@@ -59,34 +59,6 @@ func main() {
 		})
 	})
 	r.Run(os.Getenv("PORT")) // listen and serve on 0.0.0.0:3000 (for windows "localhost:3000")
-}
-
-func GetItem(db *gorm.DB) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		var data model.TodoItem
-		id, err := strconv.Atoi(c.Param("id"))
-
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-
-			return
-		}
-
-		data.Id = id
-
-		if err := db.Where("id = ?", id).First(&data).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-
-			return
-		}
-
-		c.JSON(http.StatusOK, common.SimpleSuccesResponse(data))
-
-	}
 }
 
 func EditItem(db *gorm.DB) func(c *gin.Context) {
