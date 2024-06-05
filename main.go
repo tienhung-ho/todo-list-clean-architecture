@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"todo-list/common"
+	"todo-list/middlewares"
 	ginitem "todo-list/modules/items/transport/gin"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +39,7 @@ func main() {
 
 	// CRUD: Create, Read, Update, Delete
 	// /v1/
-
+	r.Use(middlewares.Recovery())
 	v1 := r.Group("/v1")
 	{
 		items := v1.Group("/items")
@@ -51,6 +53,10 @@ func main() {
 	}
 
 	r.GET("/v1/ping", func(c *gin.Context) {
+		go func() {
+			defer common.Recovery()
+			fmt.Println([]int{}[0])
+		}()
 		c.JSON(http.StatusOK, gin.H{
 			"data": "ok",
 		})
