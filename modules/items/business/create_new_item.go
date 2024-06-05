@@ -3,6 +3,7 @@ package business
 import (
 	"context"
 	"strings"
+	"todo-list/common"
 	"todo-list/modules/items/model"
 )
 
@@ -22,11 +23,12 @@ func (biz *createItemBusiness) CreateNewItem(ctx context.Context, data *model.To
 	title := strings.TrimSpace(data.Title)
 
 	if title == "" {
+		common.NewErrorResponse(model.ErrTitleBlank, "Can not leave the title blank", "Title empty!", "TitleEmpty")
 		return model.ErrTitleBlank
 	}
 
 	if err := biz.store.CreateItem(ctx, data); err != nil {
-		return err
+		return common.ErrCannotCreateEntity(model.EntityName, err)
 	}
 
 	return nil

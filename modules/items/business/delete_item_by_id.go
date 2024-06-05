@@ -2,6 +2,7 @@ package business
 
 import (
 	"context"
+	"todo-list/common"
 	"todo-list/modules/items/model"
 )
 
@@ -22,7 +23,10 @@ func (biz *deleteItemBusiness) DeleteItem(ctx context.Context, id int) error {
 	data, err := biz.store.GetItem(ctx, map[string]interface{}{"id": id})
 
 	if err != nil {
-		return err
+		if err == common.RecordNotFound {
+			return common.ErrCannotGetEntity(model.EntityName, err)
+		}
+		return common.ErrCannotUpdateEntity(model.EntityName, err)
 	}
 
 	if data.Status != nil && *data.Status == model.ItemStatusDeleted {
@@ -30,7 +34,7 @@ func (biz *deleteItemBusiness) DeleteItem(ctx context.Context, id int) error {
 	}
 
 	if err := biz.store.DeleteItem(ctx, map[string]interface{}{"id": id}); err != nil {
-		return err
+		return common.ErrCannotDeleteEntity(model.EntityName, err)
 	}
 
 	return nil

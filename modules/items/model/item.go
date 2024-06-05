@@ -5,6 +5,10 @@ import (
 	"todo-list/common"
 )
 
+const (
+	EntityName = "Item"
+)
+
 var (
 	ErrTitleBlank  = errors.New("cannot leave title blank")
 	ErrItemDeleted = errors.New("item is deleted!")
